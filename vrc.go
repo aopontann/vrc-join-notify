@@ -1,0 +1,220 @@
+package common
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"strings"
+	"time"
+)
+
+type VRC struct {
+	Client    http.Client
+	BaseURL   string
+	UserAgent string
+	Cookies   []*http.Cookie
+}
+
+type VRCUserInfo struct {
+	AgeVerificationStatus string `json:"ageVerificationStatus"`
+	AgeVerified           bool   `json:"ageVerified"`
+	AllowAvatarCopying    bool   `json:"allowAvatarCopying"`
+	Badges                []struct {
+		BadgeDescription string `json:"badgeDescription"`
+		BadgeID          string `json:"badgeId"`
+		BadgeImageURL    string `json:"badgeImageUrl"`
+		BadgeName        string `json:"badgeName"`
+		Showcased        bool   `json:"showcased"`
+	} `json:"badges"`
+	Bio                            string        `json:"bio"`
+	BioLinks                       []string      `json:"bioLinks"`
+	CurrentAvatarImageURL          string        `json:"currentAvatarImageUrl"`
+	CurrentAvatarTags              []interface{} `json:"currentAvatarTags"`
+	CurrentAvatarThumbnailImageURL string        `json:"currentAvatarThumbnailImageUrl"`
+	DateJoined                     string        `json:"date_joined"`
+	DeveloperType                  string        `json:"developerType"`
+	DisplayName                    string        `json:"displayName"`
+	FriendKey                      string        `json:"friendKey"`
+	FriendRequestStatus            string        `json:"friendRequestStatus"`
+	ID                             string        `json:"id"`
+	InstanceID                     string        `json:"instanceId"`
+	IsFriend                       bool          `json:"isFriend"`
+	LastActivity                   time.Time     `json:"last_activity"`
+	LastLogin                      time.Time     `json:"last_login"`
+	LastMobile                     interface{}   `json:"last_mobile"`
+	LastPlatform                   string        `json:"last_platform"`
+	Location                       string        `json:"location"`
+	Note                           string        `json:"note"`
+	Platform                       string        `json:"platform"`
+	ProfilePicOverride             string        `json:"profilePicOverride"`
+	ProfilePicOverrideThumbnail    string        `json:"profilePicOverrideThumbnail"`
+	Pronouns                       string        `json:"pronouns"`
+	State                          string        `json:"state"`
+	Status                         string        `json:"status"`
+	StatusDescription              string        `json:"statusDescription"`
+	Tags                           []string      `json:"tags"`
+	TravelingToInstance            string        `json:"travelingToInstance"`
+	TravelingToLocation            string        `json:"travelingToLocation"`
+	TravelingToWorld               string        `json:"travelingToWorld"`
+	UserIcon                       string        `json:"userIcon"`
+	WorldID                        string        `json:"worldId"`
+}
+
+func NewVRC() *VRC {
+	return &VRC{
+		Client:    http.Client{},
+		BaseURL:   "https://api.vrchat.cloud/api/1",
+		UserAgent: "vrc-join-notify/0.1.0 aopontan0416@gmail.com",
+		Cookies:   nil,
+	}
+}
+
+// 現在提供されている認証トークンが有効かどうかを確認する。
+func (v *VRC) VerifyAuthToken(token string) (bool, error) {
+	path := "/auth"
+	req, err := http.NewRequest("GET", v.BaseURL+path, nil)
+	if err != nil {
+		slog.Error("Failed to create request", "error", err)
+		return false, err
+	}
+	req.Header.Add("user-agent", v.UserAgent)
+
+	// 認証情報をセット
+	req.Header.Add("Cookie", "auth="+token)
+
+	// リクエスト実行
+	resp, err := v.Client.Do(req)
+	if err != nil {
+		slog.Error("Failed to execute request", "error", err)
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	for _, cookie := range resp.Cookies() {
+		fmt.Println(cookie)
+		slog.Info("Received cookie", "name", cookie.Name, "value", cookie.Value)
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		slog.Info("Auth token is valid")
+		return true, nil
+	} else {
+		slog.Info("Auth token is invalid", "status", resp.StatusCode)
+		return false, nil
+	}
+}
+
+func (v *VRC) Login(username, password string) (string, error) {
+	req, err := http.NewRequest("GET", v.BaseURL+"/auth/user", nil)
+	if err != nil {
+		slog.Error("Failed to create request", "error", err)
+		return "", err
+	}
+
+	// 認証情報をセット
+	req.SetBasicAuth(username, password)
+	req.Header.Add("user-agent", v.UserAgent)
+	// リクエスト実行
+	resp, err := v.Client.Do(req)
+	if err != nil {
+		slog.Error("Failed to execute request", "error", err)
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	for _, cookie := range resp.Cookies() {
+		fmt.Println(cookie)
+		slog.Info("Received cookie", "name", cookie.Name, "value", cookie.Value)
+		if cookie.Name == "auth" {
+			slog.Info("Found auth cookie", "value", cookie.Value)
+			return cookie.Value, nil
+		}
+	}
+
+	slog.Info("No auth cookie found in response")
+	return "", nil
+}
+
+func (v *VRC) Verify2FA(code string, auth string) (string, error) {
+	url := "https://api.vrchat.cloud/api/1/auth/twofactorauth/emailotp/verify"
+	bodyStr := `{"code":"` + code + `"}`
+	body := strings.NewReader(bodyStr)
+	req, _ := http.NewRequest("POST", url, body)
+	req.Header.Add("user-agent", "vrc-join-notify/0.1.0 aopontan0416@gmail.com")
+	req.Header.Add("Cookie", "auth="+auth)
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := v.Client.Do(req)
+	if err != nil {
+		slog.Error("Failed to execute request", "error", err)
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		slog.Error("Failed to verify 2FA", "status", resp.StatusCode)
+		return "", fmt.Errorf("failed to verify 2FA, status code: %d", resp.StatusCode)
+	}
+
+	for _, cookie := range resp.Cookies() {
+		slog.Info("Received cookie", "name", cookie.Name, "value", cookie.Value)
+		if cookie.Name == "twoFactorAuth" {
+			slog.Info("Found auth cookie", "value", cookie.Value)
+			return cookie.Value, nil
+		}
+	}
+
+	slog.Info("No twoFactorAuth cookie found in response")
+	return "", nil
+}
+
+
+func (v *VRC) GetUserInfo(userID string, auth string, twoFactorAuth string) (VRCUserInfo, error) {
+	// 認証情報のセット
+	authCookie := &http.Cookie{
+		Domain:   "api.vrchat.cloud",
+		Path:     "/",
+		HttpOnly: true,
+		Name:     "auth",
+		Value:    auth,
+	}
+	twoFactorAuthCookie := &http.Cookie{
+		Domain:   "api.vrchat.cloud",
+		Path:     "/",
+		HttpOnly: true,
+		Name:     "twoFactorAuth",
+		Value:    twoFactorAuth,
+	}
+
+	url := "https://api.vrchat.cloud/api/1/users/" + userID
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Add("user-agent", "vrc-join-notify/0.1.0 aopontan0416@gmail.com")
+
+	req.AddCookie(authCookie)
+	req.AddCookie(twoFactorAuthCookie)
+
+	resp, err := v.Client.Do(req)
+	if err != nil {
+		slog.Error("Failed to execute request", "error", err)
+		return VRCUserInfo{}, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println(err)
+		return VRCUserInfo{}, err
+	}
+
+	fmt.Println(string(body))
+
+	var userInfo VRCUserInfo
+	if err := json.Unmarshal(body, &userInfo); err != nil {
+		slog.Error("Failed to unmarshal user info", "error", err)
+		return VRCUserInfo{}, err
+	}
+
+	return userInfo, nil
+}
