@@ -302,6 +302,11 @@ func NotifyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for discordID, userInfo := range userInfos {
+		// 初回ログインをしていない場合やターゲットユーザが登録されていない場合はスキップ
+		if userInfo.Token == "" || userInfo.TwoFactorAuthToken == "" || userInfo.TargetVRCUserID == "" {
+			continue
+		}
+
 		// トークンがまだ有効か確認
 		ok, err := vrc.VerifyAuthToken(userInfo.Token)
 		if err != nil {
