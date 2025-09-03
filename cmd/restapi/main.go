@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/aopontann/vrc-join-notify/internal/firestore"
+	"github.com/aopontann/vrc-join-notify/internal/handler"
 	godotenv "github.com/joho/godotenv"
-
-	c "github.com/aopontann/vrc-join-notify"
 )
 
 // DiscordWebhook をローカルで動作確認するためのエンドポイント
@@ -40,7 +40,14 @@ func main() {
 		}
 	}
 
-	http.HandleFunc("/", c.DiscordBotHandler)
+	db, err := firestore.NewDB()
+	if err != nil {
+		slog.Error("failed to connect to firestore: " + err.Error())
+		return
+	}
+
+	http.HandleFunc("/bot", handler.DiscordBotHandler(db))
+	http.HandleFunc("/notify", handler.NotifyHandler(db))
 
 	port := os.Getenv("PORT")
 	if port == "" {

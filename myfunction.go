@@ -5,9 +5,18 @@ import (
 	"os"
 
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
+
+	"github.com/aopontann/vrc-join-notify/internal/firestore"
+	"github.com/aopontann/vrc-join-notify/internal/handler"
 )
 
 func init() {
+	db, err := firestore.NewDB()
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
 	// Cloud Logging用のログ設定
 	ops := slog.HandlerOptions{
 		AddSource: true,
@@ -27,6 +36,6 @@ func init() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &ops))
 	slog.SetDefault(logger)
 
-	functions.HTTP("bot", DiscordBotHandler)
-	functions.HTTP("notify", NotifyHandler)
+	functions.HTTP("bot", handler.DiscordBotHandler(db))
+	functions.HTTP("notify", handler.NotifyHandler(db))
 }

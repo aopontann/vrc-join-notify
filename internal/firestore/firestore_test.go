@@ -1,4 +1,4 @@
-package common
+package firestore
 
 import (
 	"fmt"
@@ -86,7 +86,7 @@ func TestGetAllUserInfo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get all user info: %v", err)
 	}
-	
+
 	for discordID, userInfo := range users {
 		fmt.Printf("Discord ID: %s, User Info: %+v\n", discordID, userInfo)
 	}

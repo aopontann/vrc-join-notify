@@ -1,8 +1,9 @@
-package common
+package firestore
 
 import (
 	"context"
 	"log"
+	"os"
 
 	"cloud.google.com/go/firestore"
 )
@@ -11,16 +12,8 @@ type DB struct {
 	Client *firestore.Client
 }
 
-type UserInfo struct {
-	ChannelID          string `firestore:"channel_id,omitempty"`
-	TargetVRCUserID    string `firestore:"target_vrc_user_id,omitempty"`
-	Token              string `firestore:"token,omitempty"`
-	TwoFactorAuthToken string `firestore:"two_factor_auth_token,omitempty"`
-	Notificationed     bool   `firestore:"notificationed,omitempty"`
-}
-
 func NewDB() (*DB, error) {
-	projectID := "vrc-join-notify"
+	projectID := os.Getenv("PROJECT_ID")
 	ctx := context.Background()
 	client, err := firestore.NewClientWithDatabase(ctx, projectID, projectID)
 	if err != nil {
@@ -30,7 +23,10 @@ func NewDB() (*DB, error) {
 }
 
 func (db *DB) Close() {
-	db.Client.Close()
+	err := db.Client.Close()
+	if err != nil {
+		return
+	}
 }
 
 func (db *DB) SaveUserInfo(discordID string, channelID string) error {
@@ -50,7 +46,6 @@ func (db *DB) SaveUserToken(discordID string, token string) error {
 	return err
 }
 
-// twoFactorAuth
 func (db *DB) SaveUserTwoFactorAuthToken(discordID string, token string) error {
 	_, err := db.Client.Collection("users").Doc(discordID).Update(context.Background(), []firestore.Update{
 		{
