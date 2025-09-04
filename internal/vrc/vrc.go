@@ -18,7 +18,7 @@ func NewVRC() *VRC {
 	}
 }
 
-// 現在提供されている認証トークンが有効かどうかを確認する。
+// VerifyAuthToken は現在提供されている認証トークンが有効かどうかを確認する。
 func (v *VRC) VerifyAuthToken(token string) (bool, error) {
 	path := "/auth"
 	req, err := http.NewRequest("GET", v.BaseURL+path, nil)
@@ -106,7 +106,7 @@ func (v *VRC) Verify2FA(code string, auth string) (string, error) {
 	return "", nil
 }
 
-func (v *VRC) GetUserInfo(userID string, auth string, twoFactorAuth string) (VRCUserInfo, error) {
+func (v *VRC) GetUserInfo(userID string, auth string, twoFactorAuth string) (UserInfo, error) {
 	// 認証情報のセット
 	authCookie := &http.Cookie{
 		Domain:   "api.vrchat.cloud",
@@ -133,22 +133,22 @@ func (v *VRC) GetUserInfo(userID string, auth string, twoFactorAuth string) (VRC
 	resp, err := v.Client.Do(req)
 	if err != nil {
 		slog.Error("Failed to execute request", "error", err)
-		return VRCUserInfo{}, err
+		return UserInfo{}, err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println(err)
-		return VRCUserInfo{}, err
+		return UserInfo{}, err
 	}
 
 	fmt.Println(string(body))
 
-	var userInfo VRCUserInfo
+	var userInfo UserInfo
 	if err := json.Unmarshal(body, &userInfo); err != nil {
 		slog.Error("Failed to unmarshal user info", "error", err)
-		return VRCUserInfo{}, err
+		return UserInfo{}, err
 	}
 
 	return userInfo, nil

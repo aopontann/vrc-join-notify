@@ -14,7 +14,7 @@ func NotifyHandler(db *firestore.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		discord, err := discordgo.New("Bot " + os.Getenv("DISCORD_TOKEN"))
 		if err != nil {
-			ErrorHandler(w, r, err, http.StatusInternalServerError)
+			ErrorHandler(w, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -22,7 +22,7 @@ func NotifyHandler(db *firestore.DB) http.HandlerFunc {
 
 		userInfos, err := db.GetAllUserInfo()
 		if err != nil {
-			ErrorHandler(w, r, err, http.StatusInternalServerError)
+			ErrorHandler(w, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -35,7 +35,7 @@ func NotifyHandler(db *firestore.DB) http.HandlerFunc {
 			// トークンがまだ有効か確認
 			ok, err := vrc.VerifyAuthToken(userInfo.Token)
 			if err != nil {
-				ErrorHandler(w, r, err, http.StatusInternalServerError)
+				ErrorHandler(w, err, http.StatusInternalServerError)
 				continue
 			}
 
@@ -49,12 +49,12 @@ func NotifyHandler(db *firestore.DB) http.HandlerFunc {
 				if !userInfo.Notificationed {
 					// Discordへの通知
 					if _, err := discord.ChannelMessageSend(userInfo.ChannelID, "再ログインしてください。"); err != nil {
-						ErrorHandler(w, r, err, http.StatusInternalServerError)
+						ErrorHandler(w, err, http.StatusInternalServerError)
 						continue
 					}
 					// 次回実行時に通知しないようにするための処理
 					if err := db.ChangeNotificationed(discordID, true); err != nil {
-						ErrorHandler(w, r, err, http.StatusInternalServerError)
+						ErrorHandler(w, err, http.StatusInternalServerError)
 					}
 					continue
 				}
@@ -69,33 +69,36 @@ func NotifyHandler(db *firestore.DB) http.HandlerFunc {
 			if tu.State == "online" && tu.Status == "join me" && !userInfo.Notificationed {
 				// Discordへの通知
 				if _, err := discord.ChannelMessageSend(userInfo.ChannelID, tu.DisplayName+" さんがオンラインになりました。"); err != nil {
-					ErrorHandler(w, r, err, http.StatusInternalServerError)
+					ErrorHandler(w, err, http.StatusInternalServerError)
 					continue
 				}
 
 				// 次回実行時に通知しないようにするための処理
 				err := db.ChangeNotificationed(discordID, true)
 				if err != nil {
-					ErrorHandler(w, r, err, http.StatusInternalServerError)
+					ErrorHandler(w, err, http.StatusInternalServerError)
 					continue
 				}
 
 			}
 			// オフラインになった場合、通知フラグをFALSEに戻す
-			if tu.State == "online" && userInfo.Notificationed {
+			if tu.State == "offline" && userInfo.Notificationed {
 				err := db.ChangeNotificationed(discordID, false)
 				if err != nil {
-					ErrorHandler(w, r, err, http.StatusInternalServerError)
+					ErrorHandler(w, err, http.StatusInternalServerError)
 					continue
 				}
 			}
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		if _, err := w.Write([]byte("OK")); err != nil {
+			ErrorHandler(w, err, http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
-func ErrorHandler(w http.ResponseWriter, r *http.Request, err error, status int) {
+func ErrorHandler(w http.ResponseWriter, err error, status int) {
 	slog.Error(err.Error())
 	http.Error(w, err.Error(), status)
 }

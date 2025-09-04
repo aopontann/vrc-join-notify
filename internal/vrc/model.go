@@ -12,7 +12,7 @@ type VRC struct {
 	Cookies   []*http.Cookie
 }
 
-type VRCUserInfo struct {
+type UserInfo struct {
 	AgeVerificationStatus string `json:"ageVerificationStatus"`
 	AgeVerified           bool   `json:"ageVerified"`
 	AllowAvatarCopying    bool   `json:"allowAvatarCopying"`
