@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -13,7 +14,7 @@ func NewVRC() *VRC {
 	return &VRC{
 		Client:    http.Client{},
 		BaseURL:   "https://api.vrchat.cloud/api/1",
-		UserAgent: "vrc-join-notify/0.1.0 aopontan0416@gmail.com",
+		UserAgent: os.Getenv("USER_AGENT"),
 		Cookies:   nil,
 	}
 }
@@ -43,7 +44,8 @@ func (v *VRC) VerifyAuthToken(token string) (bool, error) {
 }
 
 func (v *VRC) Login(username, password string) (string, error) {
-	req, err := http.NewRequest("GET", v.BaseURL+"/auth/user", nil)
+	path := "/auth/user"
+	req, err := http.NewRequest("GET", v.BaseURL+path, nil)
 	if err != nil {
 		slog.Error("Failed to create request", "error", err)
 		return "", err
@@ -74,11 +76,11 @@ func (v *VRC) Login(username, password string) (string, error) {
 }
 
 func (v *VRC) Verify2FA(code string, auth string) (string, error) {
-	url := "https://api.vrchat.cloud/api/1/auth/twofactorauth/emailotp/verify"
+	path := "/auth/twofactorauth/emailotp/verify"
 	bodyStr := `{"code":"` + code + `"}`
 	body := strings.NewReader(bodyStr)
-	req, _ := http.NewRequest("POST", url, body)
-	req.Header.Add("user-agent", "vrc-join-notify/0.1.0 aopontan0416@gmail.com")
+	req, _ := http.NewRequest("POST", v.BaseURL+path, body)
+	req.Header.Add("user-agent", v.UserAgent)
 	req.Header.Add("Cookie", "auth="+auth)
 	req.Header.Add("Content-Type", "application/json")
 
@@ -107,28 +109,10 @@ func (v *VRC) Verify2FA(code string, auth string) (string, error) {
 }
 
 func (v *VRC) GetUserInfo(userID string, auth string, twoFactorAuth string) (UserInfo, error) {
-	// 認証情報のセット
-	authCookie := &http.Cookie{
-		Domain:   "api.vrchat.cloud",
-		Path:     "/",
-		HttpOnly: true,
-		Name:     "auth",
-		Value:    auth,
-	}
-	twoFactorAuthCookie := &http.Cookie{
-		Domain:   "api.vrchat.cloud",
-		Path:     "/",
-		HttpOnly: true,
-		Name:     "twoFactorAuth",
-		Value:    twoFactorAuth,
-	}
-
-	url := "https://api.vrchat.cloud/api/1/users/" + userID
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Add("user-agent", "vrc-join-notify/0.1.0 aopontan0416@gmail.com")
-
-	req.AddCookie(authCookie)
-	req.AddCookie(twoFactorAuthCookie)
+	path := "/users/" + userID
+	req, _ := http.NewRequest("GET", v.BaseURL+path, nil)
+	req.Header.Add("user-agent", v.UserAgent)
+	req.Header.Add("Cookie", "auth="+auth+";twoFactorAuth="+twoFactorAuth)
 
 	resp, err := v.Client.Do(req)
 	if err != nil {
