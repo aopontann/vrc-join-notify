@@ -73,7 +73,31 @@ func DiscordBotHandler(db *firestore.DB) http.HandlerFunc {
 			slog.Info("Creating user channel", "channel_id", ch.ID)
 
 			// チャンネルにメッセージを送信
-			if _, err := discord.ChannelMessageSend(ch.ID, "Hello! This is a test message from the VRChat Join Notify restapi."); err != nil {
+			c := `
+アプリのインストールが完了しました。
+指定したフレンドが「だれでもおいで」ステータスになったとき通知を受け取れるアプリです。
+操作は基本的にスラッシュコマンドを用います。
+スラッシュコマンドは画面下のゲームパッドボタンから実行できます。
+スラッシュコマンド一覧
+- /auth login		ログイン
+- /auth logout		ログアウト
+- /auth email-code	2段階認証
+- /join register	通知登録
+
+使い方
+1. ユーザ名とパスワードを指定してログインコマンドを実行してください。
+2. 「メールに認証コードが送信されました。」と表示された場合は、メールに届いた番号を指定して2段階認証コマンドを実行してください。
+3. 通知を受け取りたいフレンドのVRChatのWEBページのURLを指定して、通知登録コマンドを実行してください。
+4. 指定したフレンドが「だれでもおいで」ステータスになったとき通知が届きます。
+
+備考
+- 「再ログインしてください。」とメッセージが届いた場合、ログインコマンドを再実行してください。
+- 通知対象のフレンドは1人のみ指定できます。
+- 他のフレンドの通知を受け取りたい場合、通知登録コマンドを再実行してください。
+- フレンドのVRChatのWEBページのURLは次のようなものです。（https://vrchat.com/home/user/XXXXXX）
+`
+
+			if _, err := discord.ChannelMessageSend(ch.ID, c); err != nil {
 				http.Error(w, "Error sending message", http.StatusInternalServerError)
 				return
 			}
