@@ -3,7 +3,16 @@ package firestore
 import (
 	"fmt"
 	"testing"
+
+	"github.com/joho/godotenv"
 )
+
+func TestMain(m *testing.M) {
+	if err := godotenv.Load("../../.env.dev"); err != nil {
+		panic(err)
+	}
+	m.Run()
+}
 
 func TestNewDB(t *testing.T) {
 	client, err := NewDB()

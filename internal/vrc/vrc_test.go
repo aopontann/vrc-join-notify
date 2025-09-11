@@ -2,14 +2,24 @@ package vrc
 
 import (
 	"fmt"
+	"os"
 	"testing"
+
+	"github.com/joho/godotenv"
 )
+
+func TestMain(m *testing.M) {
+	if err := godotenv.Load("../../.env.dev"); err != nil {
+		panic(err)
+	}
+	m.Run()
+}
 
 func TestGetVRCUserInfo(t *testing.T) {
 	vrc := NewVRC()
-	auth := ""
-	twoFactorAuth := ""
-	userID := ""
+	auth := os.Getenv("VRC_TOKEN")
+	twoFactorAuth := os.Getenv("VRC_TOKEN_2FA")
+	userID := os.Getenv("VRC_USER_ID")
 	userInfo, err := vrc.GetUserInfo(userID, auth, twoFactorAuth)
 	if err != nil {
 		t.Fatalf("Failed to get user info: %v", err)
